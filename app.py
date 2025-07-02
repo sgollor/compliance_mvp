@@ -63,17 +63,31 @@ def upload_file():
             # Check for any missing values
             if df.isnull().any().any():
                 return "CSV contains missing values", 400
+            
+            # Try converting txn_amount to numeric 
+            # # Clean commas out of txn_amount before converting
+            df['txn_amount'] = pd.to_numeric(df['txn_amount'].astype(str).str.replace(',', ''), errors='coerce')
 
-            # Convert txn_amount to numeric
-            df['txn_amount'] = pd.to_numeric(df['txn_amount'], errors='coerce')
-
-            # Convert id_expiry and txn_time to datetime
+            # Try converting txn_time and id_expiry to datetime
             df['txn_time'] = pd.to_datetime(df['txn_time'], errors='coerce')
             df['id_expiry'] = pd.to_datetime(df['id_expiry'], errors='coerce')
 
-            # Check for conversion errors
-            if df[['txn_amount', 'txn_time', 'id_expiry']].isnull().any().any():
-                return "CSV contains invalid data types (e.g., wrong dates or numbers)", 400
+            # Check each field individually for NaN/NaT issues and build error message
+            invalid_columns = []
+
+            if df['txn_amount'].isnull().any():
+                invalid_columns.append('txn_amount')
+
+            if df['txn_time'].isnull().any():
+                invalid_columns.append('txn_time')
+
+            if df['id_expiry'].isnull().any():
+                invalid_columns.append('id_expiry')
+
+            # If any invalid columns found, return specific message
+            if invalid_columns:
+                return f"Invalid data types in column(s): {', '.join(invalid_columns)}", 400
+
 
         except Exception as e:
             return f"Error reading file: {str(e)}", 400
