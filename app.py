@@ -1,5 +1,8 @@
+# Import the necessary Flask tools to create a web server
 from flask import Flask, request, render_template, redirect, url_for
+# Import os to interact with the file system (like saving uploads)
 import os
+# Import pandas to work with CSV files and data validation later
 import pandas as pd
 
 # Create an instance of the Flask app
@@ -88,12 +91,25 @@ def upload_file():
             if invalid_columns:
                 return f"Invalid data types in column(s): {', '.join(invalid_columns)}", 400
 
-
         except Exception as e:
             return f"Error reading file: {str(e)}", 400
         # END CSV VALIDATION BLOCK
 
-        return f"File {file.filename} uploaded successfully!"
+        # Load into DataFrame here
+        try:
+            # Attempt to load the CSV into a DataFrame
+            df = pd.read_csv(filepath)
+
+            print("Parsed CSV:")
+            print(df.head()) # For debug
+            print("Column Types:")
+            print(df.dtypes) # For debug
+
+            # Proceed to next route or render template with DataFrame
+            return f"File {file.filename} uploaded and parsed successfully!"
+        except Exception as e:
+            # Handle errors during CSV parsing
+            return f"Error parsing CSV to DataFrame: {e}", 400
     
     # If the file is not a CSV, return an error
     return "Invalid file type", 400
