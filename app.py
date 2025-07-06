@@ -96,26 +96,40 @@ def upload_file():
             if invalid_columns:
                 return f"Invalid data types in column(s): {', '.join(invalid_columns)}", 400
 
-        except Exception as e:
-            return f"Error reading file: {str(e)}", 400
-        # END CSV VALIDATION BLOCK
-
-        # Load into DataFrame here
-        try:
-            # Attempt to load the CSV into a DataFrame
-            df = pd.read_csv(filepath)
-
             print("Parsed CSV:")
             print(df.head()) # For debug
             print("Column Types:")
             print(df.dtypes) # For debug
 
+            # Get today’s date for expiry comparison
+            today = pd.to_datetime(datetime.today().date())
+
+            # Define a function to apply per‐row
+            def check_kyc(row):
+                # 1. If the status isn’t 'complete', mark INCOMPLETE
+                if row['kyc_status'].lower() != 'complete':
+                    return 'INCOMPLETE'
+                # 2. If expiry is before today, mark EXPIRED
+                if pd.isna(row['id_expiry']) or row['id_expiry'] < today:
+                    return 'EXPIRED'
+                # 3. Otherwise, it’s good
+                return 'OK'
+
+            # Apply the function row-by-row to create a new column
+            df['kyc_flag'] = df.apply(check_kyc, axis=1)
+
+            # Optional: view results for debug
+            print("KYC Flags:")
+            print(df[['agent_id', 'kyc_status', 'id_expiry', 'kyc_flag']])
+
             # Proceed to next route or render template with DataFrame
-            return f"File {file.filename} uploaded and parsed successfully!"
+            return f"File {file.filename} uploaded, validated, and KYC-flagged successfully!"
+        
         except Exception as e:
-            # Handle errors during CSV parsing
-            return f"Error parsing CSV to DataFrame: {e}", 400       
-    
+             # Handle errors during CSV parsing
+            return f"Error reading and parsing file: {str(e)}", 400
+        # END CSV VALIDATION BLOCK
+                 
     # If the file is not a CSV, return an error
     return "Invalid file type", 400
 
