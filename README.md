@@ -12,12 +12,19 @@ A lightweight Python-based MVP that allows independent banking/fintech agents to
 - ✅ Flags suspicious transactions and expired KYC
 - ✅ Designed to simplify AML/KYC compliance for Nigeria’s agent networks
 
-## 🛠Tech Stack
+## Who It’s For
 
-- **Python**
-- **Flask**
-- **Pandas**
-- HTML (Jinja Templates)
+- **Fintech compliance officers**: monitor agent KYC/AML status
+- **Banking agents**: self-check and update customer compliance data
+- **Regulators (future)**: access summary reports and audit trails
+- **Open-source contributors**: improve testing, docs, UI, and automation
+
+## 🛠 Tech Stack
+
+- Python (Flask, Pandas)
+- SQLite or PostgreSQL
+- Jinja Templates (HTML)
+- ReportLab (PDF reports – coming soon)
 
 ## 📁 Folder Structure
 
