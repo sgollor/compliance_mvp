@@ -118,12 +118,25 @@ def upload_file():
             # Apply the function row-by-row to create a new column
             df['kyc_flag'] = df.apply(check_kyc, axis=1)
 
-            # Optional: view results for debug
+            # View results for debug
             print("KYC Flags:")
             print(df[['agent_id', 'kyc_status', 'id_expiry', 'kyc_flag']])
 
+            # Define your high-value threshold
+            HIGH_VALUE_THRESHOLD = 1000  # e.g., ₦1,000
+
+            # Create a new column 'aml_flag' based on txn_amount
+            # If amount > threshold → "ALERT", else → "OK"
+            df['aml_flag'] = df['txn_amount'].apply(
+            lambda amt: 'ALERT' if amt > HIGH_VALUE_THRESHOLD else 'OK'
+            )
+
+            # For debug print
+            print("AML Flags (High-Value Transactions):")
+            print(df[['agent_id', 'txn_amount', 'aml_flag']])
+
             # Proceed to next route or render template with DataFrame
-            return f"File {file.filename} uploaded, validated, and KYC-flagged successfully!"
+            return f"File {file.filename} uploaded, validated, and KYC & AML checks successfully!"
         
         except Exception as e:
              # Handle errors during CSV parsing
