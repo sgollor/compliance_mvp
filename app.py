@@ -135,6 +135,33 @@ def upload_file():
             print("AML Flags (High-Value Transactions):")
             print(df[['agent_id', 'txn_amount', 'aml_flag']])
 
+            # --- Frequency-Based AML (3+ txns/hour) ---
+            # Sort by agent and time so rolling windows work correctly
+            df = df.sort_values(['agent_id', 'txn_time'])
+
+            # Use txn_time as index for time-based rolling
+            df.set_index('txn_time', inplace=True)
+
+            # For each agent, count how many txns in the past 1 hour
+            df['txns_last_hour'] = (
+                df.groupby('agent_id')['agent_id']  # group by agent
+                    .rolling('1H')                    # look back 1 hour
+                    .count()                          # count rows
+                .reset_index(level=0, drop=True)  # align result back to df
+            )
+
+            # Flag as ALERT if count ≥3, else OK
+            df['frequency_flag'] = df['txns_last_hour'].apply(
+                lambda cnt: 'ALERT' if cnt >= 3 else 'OK'
+            )
+
+            # 6. Restore txn_time from index (if needed later as a column)
+            df.reset_index(inplace=True)
+
+            # For debug print
+            print("Frequency-based flags:")
+            print(df[['agent_id','txn_time','txns_last_hour','frequency_flag']])
+
             # Proceed to next route or render template with DataFrame
             return f"File {file.filename} uploaded, validated, and KYC & AML checks successfully!"
         
