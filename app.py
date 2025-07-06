@@ -50,9 +50,11 @@ def upload_file():
 
         # START CSV VALIDATION BLOCK
         try:
+            # MVP Task 1.2: Validate CSV structure and content (headers, data types)
             # Load CSV file into a Pandas DataFrame
             df = pd.read_csv(filepath)
 
+            # Task 1.3: Save parsed data to in-memory Pandas DataFrame or DB
             # Define expected columns
             REQUIRED_COLUMNS = [
                 'agent_id',
@@ -101,6 +103,7 @@ def upload_file():
             print("Column Types:")
             print(df.dtypes) # For debug
 
+            # Task 2.1: Implement KYC completeness checker
             # Get today’s date for expiry comparison
             today = pd.to_datetime(datetime.today().date())
 
@@ -122,6 +125,7 @@ def upload_file():
             print("KYC Flags:")
             print(df[['agent_id', 'kyc_status', 'id_expiry', 'kyc_flag']])
 
+            # Task 2.2: Implement AML rule: flag txn > threshold
             # Define your high-value threshold
             HIGH_VALUE_THRESHOLD = 1000  # e.g., ₦1,000
 
@@ -135,7 +139,7 @@ def upload_file():
             print("AML Flags (High-Value Transactions):")
             print(df[['agent_id', 'txn_amount', 'aml_flag']])
 
-            # --- Frequency-Based AML (3+ txns/hour) ---
+            # Task 2.3: Implement AML rule: flag >3 txns/hour per agent
             # Sort by agent and time so rolling windows work correctly
             df = df.sort_values(['agent_id', 'txn_time'])
 
@@ -145,7 +149,7 @@ def upload_file():
             # For each agent, count how many txns in the past 1 hour
             df['txns_last_hour'] = (
                 df.groupby('agent_id')['agent_id']  # group by agent
-                    .rolling('1H')                    # look back 1 hour
+                    .rolling('1h')                    # look back 1 hour
                     .count()                          # count rows
                 .reset_index(level=0, drop=True)  # align result back to df
             )
@@ -155,15 +159,39 @@ def upload_file():
                 lambda cnt: 'ALERT' if cnt >= 3 else 'OK'
             )
 
-            # 6. Restore txn_time from index (if needed later as a column)
+            # Restore txn_time from index (if needed later as a column)
             df.reset_index(inplace=True)
 
             # For debug print
             print("Frequency-based flags:")
             print(df[['agent_id','txn_time','txns_last_hour','frequency_flag']])
 
+            # Task 2.4: Aggregate Overall Risk per Agent
+            # Define a helper that takes a DataFrame slice for one agent
+            def compute_agent_risk(group):
+                # If any red-level flags, immediate RED
+                if (group['kyc_flag'] == 'EXPIRED').any() \
+                    or (group['aml_flag'] == 'ALERT').any() \
+                    or (group['frequency_flag'] == 'ALERT').any():
+                    return 'RED'
+                # If no RED but some INCOMPLETE KYCs, YELLOW
+                if (group['kyc_flag'] == 'INCOMPLETE').any():
+                    return 'YELLOW'
+                # Otherwise, all clear → GREEN
+                return 'GREEN'
+
+            # Group by agent_id and apply the helper to produce a Series of statuses
+            agent_risk = df.groupby('agent_id').apply(compute_agent_risk)
+
+            # Convert to a clean DataFrame for reporting
+            agent_summary = agent_risk.reset_index(name='risk_status')
+
+            # Print the summary for debug
+            print("Agent Risk Summary:")
+            print(agent_summary)
+
             # Proceed to next route or render template with DataFrame
-            return f"File {file.filename} uploaded, validated, and KYC & AML checks successfully!"
+            return f"File {file.filename} uploaded, validated, and KYC, AML checks & agent risk summary generated successfully!"
         
         except Exception as e:
              # Handle errors during CSV parsing
