@@ -1,17 +1,30 @@
-# Import the necessary Flask tools to create a web server
-from flask import Flask, request, render_template, redirect, url_for
-
 # Import os to interact with the file system (like saving uploads)
 import os
 
 # Import pandas to work with CSV files and data validation later
 import pandas as pd
 
+# Enable Flask sessions — this key signs and encrypts the session cookie
+# In production, load this from an environment variable instead of hard-coding
+import secrets
+
+import io # Import io to handle file-like objects (if needed for advanced file handling)
+
+# Import the necessary Flask tools to create a web server
+from flask import Flask, request, render_template, redirect, url_for
+
 # Import datetime to get today’s date for comparing against each agent’s ID expiry
 from datetime import datetime
 
+from flask import session # To store data across requests
+from flask import send_file # To send files back to the user (if needed later)
+
 # Create an instance of the Flask app
 app = Flask(__name__)
+
+app.secret_key = secrets.token_hex(16)  # Generate a random secret key for session management
+# This key is used to sign session cookies and should be kept secret in production
+
 # Define the folder where uploaded files will be saved
 UPLOAD_FOLDER: str = 'uploads'
 # Tell Flask to use this folder for file uploads
@@ -190,9 +203,16 @@ def upload_file():
             print("Agent Risk Summary:")
             print(agent_summary)
 
+            # Convert summary DF to list-of-dicts and store in session
+            session['agent_summary'] = agent_summary.to_dict(orient='records')
+            # This allows us to access it later in the dashboard route
+
             # Proceed to next route or render template with DataFrame
-            return f"File {file.filename} uploaded, validated, and KYC, AML checks & agent risk summary generated successfully!"
-        
+            #return f"File {file.filename} uploaded, validated, and KYC, AML checks & agent risk summary generated successfully!"
+
+            # …then send them straight to the dashboard
+            return redirect(url_for('dashboard'))
+
         except Exception as e:
              # Handle errors during CSV parsing
             return f"Error reading and parsing file: {str(e)}", 400
@@ -200,6 +220,34 @@ def upload_file():
                  
     # If the file is not a CSV, return an error
     return "Invalid file type", 400
+
+@app.route('/dashboard')
+def dashboard():
+    # Retrieve the agent_summary DataFrame we stored in session
+    data = session.get('agent_summary', [])
+    # Render the dashboard template, passing in the list of dicts
+    return render_template('dashboard.html', agents=data)
+
+@app.route('/download_report')
+def download_report():
+    # 1) Get the summary data from session
+    data = session.get('agent_summary', [])
+    
+    # 2) Turn it back into a DataFrame
+    df = pd.DataFrame(data)
+    
+    # 3) Use a StringIO buffer to hold CSV data in memory
+    output = io.StringIO()
+    df.to_csv(output, index=False)
+    output.seek(0)
+    
+    # 4) Send it as a file download
+    return send_file(
+        io.BytesIO(output.getvalue().encode()),   # file content
+        mimetype='text/csv',                      # CSV mime type
+        as_attachment=True,                       # download instead of render
+        download_name='agent_summary.csv'         # suggested filename
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

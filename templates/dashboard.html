@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compliance Dashboard</title>
+  <style>
+    /* Simple color-coding */
+    .RED    { background: #f8d7da; color: #842029; }
+    .YELLOW { background: #fff3cd; color: #664d03; }
+    .GREEN  { background: #d1e7dd; color: #0f5132; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Agent Risk Dashboard</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Agent ID</th>
+        <th>Risk Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for agent in agents %}
+      <tr class="{{ agent.risk_status }}">
+        <td>{{ agent.agent_id }}</td>
+        <td>{{ agent.risk_status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p>
+    <a href="{{ url_for('download_report') }}">Download Excel/PDF Summary</a>
+  </p>
+</body>
+</html>
