@@ -19,6 +19,16 @@ from datetime import datetime
 from flask import session # To store data across requests
 from flask import send_file # To send files back to the user (if needed later)
 
+from functools import wraps # For creating decorators to protect routes
+
+# MVP user store: username { password, role }
+USERS = {
+    'admin':   {'password': 'AdminPass123',   'role': 'admin'},
+    'officer': {'password': 'OfficerPass456', 'role': 'officer'}
+}
+# This is a simple in-memory user store for demonstration purposes
+# In a real app, use a database or secure vault for user credentials
+
 # Create an instance of the Flask app
 app = Flask(__name__)
 
@@ -33,12 +43,56 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Create the uploads folder if it doesn't already exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Define a decorator to protect routes that require login
+# This will check if the user is logged in before allowing access to certain routes
+def login_required(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if 'user' not in session:
+            # Not logged in? Send them to login page
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return wrapped
+
+# Define the login route that handles both GET and POST requests
+# GET shows the login form, POST processes the login attempt
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        user = USERS.get(username)
+
+        # Basic credential check
+        if not user or user['password'] != password:
+            error = "Invalid username or password."
+        else:
+            # Credentials OK - store user info in session
+            session['user'] = username
+            session['role'] = user['role']
+            return redirect(url_for('home'))
+
+    # GET (or bad POST) - show login form
+    return render_template('login.html', error=error)
+
+# Define a logout route to clear the session and redirect to login
+# This will be used to log out the user and clear their session data
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# EPIC 1: File Upload & CSV Validation Task 1.1: Build Flask route for file upload
+# This route will handle the file upload from the HTML form
 # Define the home route ("/") that displays the upload form
 @app.route('/')
+@login_required  # Protect this route so only logged-in users can access it
 def home():
     return render_template('upload.html') # Load the HTML form from the templates folder
 
 @app.route('/upload', methods=['POST'])  # This route only responds to POST requests from the form
+@login_required  # Protect this route so only logged-in users can access it
 def upload_file():
     # Check if the form actually included a file
     if 'file' not in request.files:
@@ -221,7 +275,11 @@ def upload_file():
     # If the file is not a CSV, return an error
     return "Invalid file type", 400
 
+# EPIC 3: Dashboard & Report UI Task 3.1: Build Flask route for compliance officer dashboard
+# Task 3.2: Display flagged agents in table with color-coded statuses Task 3.3: Enable download of TXT/PDF summary report
+
 @app.route('/dashboard')
+@login_required  # Protect this route so only logged-in users can access it
 def dashboard():
     # Retrieve the agent_summary DataFrame we stored in session
     data = session.get('agent_summary', [])

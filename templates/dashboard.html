@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Compliance Dashboard</title>
   <style>
+    /* MVP-grade navbar styling */
+    .navbar {
+        text-align: right;
+        margin: 1em;
+        }
+    </style>
+  <style>
     /* Simple color-coding */
     .RED    { background: #f8d7da; color: #842029; }
     .YELLOW { background: #fff3cd; color: #664d03; }
@@ -14,6 +21,10 @@
   </style>
 </head>
 <body>
+  <div class="navbar">
+        Logged in as <strong>{{ session.user }}</strong> |
+        <a href="{{ url_for('logout') }}">Log Out</a>
+    </div>
   <h1>Agent Risk Dashboard</h1>
   <table>
     <thead>
@@ -33,6 +44,9 @@
   </table>
   <p>
     <a href="{{ url_for('download_report') }}">Download Excel/PDF Summary</a>
+  </p>
+  <p>
+    <a href="{{ url_for('home') }}">Upload New File</a>
   </p>
 </body>
 </html>

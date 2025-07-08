@@ -4,8 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Agent Data</title>
+    <style>
+    /* MVP-grade navbar styling */
+    .navbar {
+        text-align: right;
+        margin: 1em;
+        }
+    </style>
 </head>
 <body>
+    <div class="navbar">
+        Logged in as <strong>{{ session.user }}</strong> |
+        <a href="{{ url_for('logout') }}">Log Out</a>
+    </div>
     <h1>Upload Agent Compliance Data (CSV)</h1>
     <form action="/upload" method="post" enctype="multipart/form-data">
         <label for="file">Choose a CSV file:</label><br>
@@ -13,6 +24,9 @@
         <br><br>
         <button type="submit">Upload</button>
     </form>
+    <p>
+        <a href="{{ url_for('dashboard') }}">View Dashboard</a>
+    </p>
 </body>
 </html>
 
