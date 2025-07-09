@@ -83,16 +83,36 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+# Define a decorator to restrict access to certain roles
+# This will check if the logged-in user has one of the allowed roles
+def role_required(*allowed_roles):
+    """
+    Ensures the logged-in user’s role is in the allowed list.
+    Usage: @role_required('admin', 'officer')
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            user_role = session.get('role')
+            if user_role not in allowed_roles:
+                # Optionally, flash an error or render a “403 Forbidden” page
+                return "Forbidden: insufficient permissions", 403
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
+
 # EPIC 1: File Upload & CSV Validation Task 1.1: Build Flask route for file upload
 # This route will handle the file upload from the HTML form
 # Define the home route ("/") that displays the upload form
 @app.route('/')
 @login_required  # Protect this route so only logged-in users can access it
+@role_required('admin', 'officer')
 def home():
     return render_template('upload.html') # Load the HTML form from the templates folder
 
 @app.route('/upload', methods=['POST'])  # This route only responds to POST requests from the form
 @login_required  # Protect this route so only logged-in users can access it
+@role_required('admin', 'officer')
 def upload_file():
     # Check if the form actually included a file
     if 'file' not in request.files:
@@ -280,6 +300,7 @@ def upload_file():
 
 @app.route('/dashboard')
 @login_required  # Protect this route so only logged-in users can access it
+@role_required('admin', 'officer')
 def dashboard():
     # Retrieve the agent_summary DataFrame we stored in session
     data = session.get('agent_summary', [])
