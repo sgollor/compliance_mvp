@@ -16,6 +16,8 @@
     <div class="navbar">
         Logged in as <strong>{{ session.user }}</strong> |
         <a href="{{ url_for('logout') }}">Log Out</a>
+        | <a href="{{ url_for('settings') }}">Settings</a>
+        | <a href="{{ url_for('dashboard') }}">Dashboard</a>
     </div>
     <h1>Upload Agent Compliance Data (CSV)</h1>
     <form action="/upload" method="post" enctype="multipart/form-data">

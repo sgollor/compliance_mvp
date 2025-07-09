@@ -21,6 +21,15 @@ from flask import send_file # To send files back to the user (if needed later)
 
 from functools import wraps # For creating decorators to protect routes
 
+# -------------------------------------------------------------------
+# In‐memory configuration for all compliance thresholds
+thresholds = {
+    'high_value': 1000,    # txn_amount above this - AML alert
+    'frequency_window': '1H',  # rolling window size for frequency rule
+    'frequency_limit': 3       # txn count in window that triggers alert
+}
+# -------------------------------------------------------------------
+
 # MVP user store: username { password, role }
 USERS = {
     'admin':   {'password': 'AdminPass123',   'role': 'admin'},
@@ -214,7 +223,7 @@ def upload_file():
 
             # Task 2.2: Implement AML rule: flag txn > threshold
             # Define your high-value threshold
-            HIGH_VALUE_THRESHOLD = 1000  # e.g., ₦1,000
+            HIGH_VALUE_THRESHOLD = thresholds['high_value']
 
             # Create a new column 'aml_flag' based on txn_amount
             # If amount > threshold → "ALERT", else → "OK"
@@ -234,16 +243,19 @@ def upload_file():
             df.set_index('txn_time', inplace=True)
 
             # For each agent, count how many txns in the past 1 hour
+            window = thresholds['frequency_window']
+            limit  = thresholds['frequency_limit']
+            
             df['txns_last_hour'] = (
                 df.groupby('agent_id')['agent_id']  # group by agent
-                    .rolling('1h')                    # look back 1 hour
+                    .rolling(window)                    # look back 1 hour
                     .count()                          # count rows
                 .reset_index(level=0, drop=True)  # align result back to df
             )
 
             # Flag as ALERT if count ≥3, else OK
             df['frequency_flag'] = df['txns_last_hour'].apply(
-                lambda cnt: 'ALERT' if cnt >= 3 else 'OK'
+                lambda cnt: 'ALERT' if cnt >= limit else 'OK'
             )
 
             # Restore txn_time from index (if needed later as a column)
@@ -327,6 +339,40 @@ def download_report():
         as_attachment=True,                       # download instead of render
         download_name='agent_summary.csv'         # suggested filename
     )
+
+# EPIC 4: Task 4.3: Admin‐only Threshold Settings
+@app.route('/settings', methods=['GET','POST'])
+@login_required
+@role_required('admin')
+def settings():
+    error = None
+
+    if request.method == 'POST':
+        try:
+            # Pull and coerce from form
+            hv = int(request.form['high_value'])
+            fw = request.form['frequency_window'].strip()
+            fl = int(request.form['frequency_limit'])
+
+            # Basic validation
+            if hv <= 0 or fl <= 0:
+                raise ValueError("Thresholds must be positive")
+
+            # Persist into our global store
+            thresholds['high_value']       = hv
+            thresholds['frequency_window'] = fw
+            thresholds['frequency_limit']  = fl
+
+            return redirect(url_for('settings'))  # PRG: refresh to GET
+
+        except Exception as e:
+            error = f"Invalid input: {e}"
+
+    # On GET (or invalid POST), render the form with current values
+    return render_template('settings.html',
+                           thresholds=thresholds,
+                           error=error)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

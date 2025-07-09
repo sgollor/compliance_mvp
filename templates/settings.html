@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Threshold Settings</title>
+  <style>
+    .navbar { text-align: right; margin: 1em; }
+    form { max-width: 400px; margin: auto; }
+    label, input { display: block; margin-bottom: 0.5em; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    Logged in as <strong>{{ session.user }}</strong> |
+    <a href="{{ url_for('logout') }}">Log Out</a> |
+    <a href="{{ url_for('home') }}">Upload</a> |
+    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+  </div>
+
+  <h1>Admin: Compliance Thresholds</h1>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form method="post">
+    <label for="high_value">High‐Value AML Threshold (₦):</label>
+    <input id="high_value" name="high_value" type="number"
+           value="{{ thresholds.high_value }}" required min="1">
+
+    <label for="frequency_window">Frequency Window (Pandas offset):</label>
+    <input id="frequency_window" name="frequency_window" type="text"
+           value="{{ thresholds.frequency_window }}" required>
+
+    <label for="frequency_limit">Frequency Limit (txns):</label>
+    <input id="frequency_limit" name="frequency_limit" type="number"
+           value="{{ thresholds.frequency_limit }}" required min="1">
+
+    <button type="submit">Save Settings</button>
+  </form>
+
+</body>
+</html>
