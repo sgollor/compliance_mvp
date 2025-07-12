@@ -21,6 +21,14 @@ from flask import send_file # To send files back to the user (if needed later)
 
 from functools import wraps # For creating decorators to protect routes
 
+from rules import (
+    check_kyc_status,
+    flag_high_value,
+    compute_txns_last_window,
+    compute_frequency_flag,
+    aggregate_agent_risk
+)
+
 # -------------------------------------------------------------------
 # In‐memory configuration for all compliance thresholds
 thresholds = {
@@ -199,23 +207,16 @@ def upload_file():
             print("Column Types:")
             print(df.dtypes) # For debug
 
+             # ——— INLINE COMPLIANCE LOGIC STARTS HERE ———
+
             # Task 2.1: Implement KYC completeness checker
             # Get today’s date for expiry comparison
             today = pd.to_datetime(datetime.today().date())
 
-            # Define a function to apply per‐row
-            def check_kyc(row):
-                # 1. If the status isn’t 'complete', mark INCOMPLETE
-                if row['kyc_status'].lower() != 'complete':
-                    return 'INCOMPLETE'
-                # 2. If expiry is before today, mark EXPIRED
-                if pd.isna(row['id_expiry']) or row['id_expiry'] < today:
-                    return 'EXPIRED'
-                # 3. Otherwise, it’s good
-                return 'OK'
-
-            # Apply the function row-by-row to create a new column
-            df['kyc_flag'] = df.apply(check_kyc, axis=1)
+            df['kyc_flag'] = df.apply(
+                lambda r: check_kyc_status(r['kyc_status'], r['id_expiry'], today),
+                axis=1
+            )
 
             # View results for debug
             print("KYC Flags:")
@@ -223,12 +224,12 @@ def upload_file():
 
             # Task 2.2: Implement AML rule: flag txn > threshold
             # Define your high-value threshold
-            HIGH_VALUE_THRESHOLD = thresholds['high_value']
+            #HIGH_VALUE_THRESHOLD = thresholds['high_value']
 
             # Create a new column 'aml_flag' based on txn_amount
             # If amount > threshold → "ALERT", else → "OK"
             df['aml_flag'] = df['txn_amount'].apply(
-            lambda amt: 'ALERT' if amt > HIGH_VALUE_THRESHOLD else 'OK'
+                lambda amt: flag_high_value(amt, thresholds['high_value'])
             )
 
             # For debug print
@@ -237,29 +238,9 @@ def upload_file():
 
             # Task 2.3: Implement AML rule: flag >3 txns/hour per agent
             # Sort by agent and time so rolling windows work correctly
-            df = df.sort_values(['agent_id', 'txn_time'])
-
-            # Use txn_time as index for time-based rolling
-            df.set_index('txn_time', inplace=True)
-
-            # For each agent, count how many txns in the past 1 hour
-            window = thresholds['frequency_window']
-            limit  = thresholds['frequency_limit']
-            
-            df['txns_last_hour'] = (
-                df.groupby('agent_id')['agent_id']  # group by agent
-                    .rolling(window)                    # look back 1 hour
-                    .count()                          # count rows
-                .reset_index(level=0, drop=True)  # align result back to df
-            )
-
-            # Flag as ALERT if count ≥3, else OK
-            df['frequency_flag'] = df['txns_last_hour'].apply(
-                lambda cnt: 'ALERT' if cnt >= limit else 'OK'
-            )
-
-            # Restore txn_time from index (if needed later as a column)
-            df.reset_index(inplace=True)
+            txns_last = compute_txns_last_window(df['txn_time'], thresholds['frequency_window'])
+            df['txns_last_hour'] = txns_last 
+            df['frequency_flag'] = compute_frequency_flag(txns_last, thresholds['frequency_limit'])
 
             # For debug print
             print("Frequency-based flags:")
@@ -267,27 +248,13 @@ def upload_file():
 
             # Task 2.4: Aggregate Overall Risk per Agent
             # Define a helper that takes a DataFrame slice for one agent
-            def compute_agent_risk(group):
-                # If any red-level flags, immediate RED
-                if (group['kyc_flag'] == 'EXPIRED').any() \
-                    or (group['aml_flag'] == 'ALERT').any() \
-                    or (group['frequency_flag'] == 'ALERT').any():
-                    return 'RED'
-                # If no RED but some INCOMPLETE KYCs, YELLOW
-                if (group['kyc_flag'] == 'INCOMPLETE').any():
-                    return 'YELLOW'
-                # Otherwise, all clear → GREEN
-                return 'GREEN'
-
-            # Group by agent_id and apply the helper to produce a Series of statuses
-            agent_risk = df.groupby('agent_id').apply(compute_agent_risk)
-
-            # Convert to a clean DataFrame for reporting
-            agent_summary = agent_risk.reset_index(name='risk_status')
+            agent_summary = aggregate_agent_risk(df)
 
             # Print the summary for debug
             print("Agent Risk Summary:")
             print(agent_summary)
+
+            # ——— INLINE COMPLIANCE LOGIC ENDS HERE ———
 
             # Convert summary DF to list-of-dicts and store in session
             session['agent_summary'] = agent_summary.to_dict(orient='records')
